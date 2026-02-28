@@ -1,1 +1,123 @@
+# configs/gradient_loss.yaml
+# Configuration for Gradient-Loss model (19.04 μm MAE)
 
+model:
+  name: "RNFLPredictor"
+  backbone:
+    name: "vit_large_patch16_224"  # RETFound architecture
+    pretrained: true
+    pretrained_path: "./weights/retfound_weights.pth"  # Anonymized generic path
+    freeze_layers: 0  # No freezing (aggressive adaptation)
+  
+  projection_head:
+    input_dim: 1024  # ViT-L output dimension
+    hidden_dims: [256, 64]
+    output_dim: 1  # Single depth value per patch
+    activation: "gelu"
+    dropout: 0.1
+  
+  radial_aggregator:
+    radius_ratio: 0.35  # 35% of image size from center
+    n_points: 360  # Sample 360 points around circle
+    interpolation: "bilinear"
+  
+  rnfl_head:
+    input_dim: 360
+    hidden_dims: [512, 512]
+    output_dim: 360
+    activation: "relu"
+    dropout: 0.2
+    layer_norm: true
+
+training:
+  # Optimization
+  optimizer: "adamw"
+  learning_rate:
+    encoder: 5.0e-5  # Aggressive LR for backbone
+    head: 1.0e-4     # Standard LR for task head
+  weight_decay: 0.05
+  
+  # Schedule
+  epochs: 80
+  warmup_epochs: 5
+  scheduler: "cosine"
+  min_lr: 1.0e-7
+  
+  # Batch
+  batch_size: 60  # Effective batch size via accumulation
+  gradient_accumulation_steps: 6  # Actual batch: 10, accumulate 6 times
+  
+  # Regularization
+  gradient_clip_norm: 1.0
+  mixed_precision: true  # FP16 training
+  
+  # Early stopping
+  patience: 15
+  monitor: "val_mae"
+  mode: "min"
+
+loss:
+  type: "gradient_loss"
+  mae_weight: 1.0
+  gradient_weight: 0.2  # λ_g = 0.2
+  gradient_order: 1  # First-order derivatives
+
+data:
+  dataset: "fairfedmed"
+  train_path: "./data/FairFedMed/train"
+  val_path: "./data/FairFedMed/val"
+  test_path: "./data/FairFedMed/test"
+  
+  # Image preprocessing
+  image_size: 224
+  normalize:
+    mean: [0.485, 0.456, 0.406]
+    std: [0.229, 0.224, 0.225]
+  
+  # Augmentation (intensity only, preserve spatial structure)
+  augmentation:
+    brightness: 0.2
+    contrast: 0.2
+    gaussian_noise: 0.05
+    gaussian_blur: 
+      kernel_size: [3, 5]
+      sigma: [0.1, 2.0]
+    clahe: true
+    # NO: rotation, flip, crop (would break radial structure)
+  
+  # Dataloader
+  num_workers: 4
+  pin_memory: true
+  persistent_workers: true
+
+logging:
+  project_name: "miccai-2026-rnfl"
+  experiment_name: "gradient_loss"
+  log_dir: "./logs"
+  
+  # What to log
+  log_every_n_steps: 50
+  save_checkpoints: true
+  checkpoint_dir: "./checkpoints"
+  save_top_k: 3  # Keep best 3 checkpoints
+  
+  # Optional: Weights & Biases
+  use_wandb: false
+  wandb_project: "rnfl-prediction"
+
+evaluation:
+  metrics:
+    - "mae"        # Mean Absolute Error (primary)
+    - "pearson_r"  # Pearson correlation
+    - "r2"         # R² score
+    - "sigma_pred" # Prediction variance (template overfitting check)
+    - "fairness_gap"  # Demographic fairness
+  
+  # Sector-wise evaluation
+  compute_sectors: true
+  sectors: ["superior", "nasal", "inferior", "temporal"]
+
+# Reproducibility
+seed: 42
+deterministic: true
+benchmark: false  # Set true for speed, false for reproducibility
