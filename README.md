@@ -33,13 +33,27 @@ python scripts/evaluate.py \
 
 ## 📊 Main Results (from Paper)
 
-### Table 1: Multi-Backbone Comparison
-| Method | Backbone | MAE (μm) ↓ | Pearson R ↑ | σ(pred) (μm) |
-| :--- | :--- | :--- | :--- | :--- |
-| Naive | RETFound | 19.52 | 0.662 | 12.3 |
-| Aggressive | RETFound | 19.25 | 0.676 | 12.3 |
-| **Gradient-Loss (Ours)** | RETFound | **19.04** | **0.676** | **11.8** |
-| Structured | RETFound | 24.80 | 0.458 | 4.8 (Collapsed) |
+### Table 1: Multi-Backbone Performance and Metric Collapse Analysis
+| Backbone | Pre-train | Protocol | MAE ($\mu m$) ↓ | Pearson R ↑ | Fairness Gap ↓ | $\Delta$ vs. Naive ↓ | $\sigma_{pred}$ ($\mu m$) |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **ImageNet (ViT-B/16)** | Classification | Naive | 19.79 | 0.661 | 1.60 | - | 12.4 |
+| | | Aggressive | 19.92 | 0.661 | 1.72 | +0.7% | 12.2 |
+| | | Structured | 24.68 | 0.649 | 1.85 | +24.7% | 10.8 |
+| **DepthAny (V2-Small)** | Depth (Metric) | Naive | 19.93 | 0.661 | 1.64 | - | 12.5 |
+| | | Aggressive | 19.88 | 0.662 | 1.70 | +0.3% | 12.3 |
+| | | Structured | 24.75 | 0.645 | 1.82 | +24.2% | 10.6 |
+| **RETFound (ViT-L/16)** | MAE Semantic | Naive | 19.52 | 0.662 | 1.68 | - | 12.3 |
+| | | Aggressive | 19.25 | 0.676 | 1.79 | -1.4% | 12.3 |
+| | | **Gradient-Loss (Ours)** | **19.04\***| **0.676** | 2.40 | **-2.5%** | **11.8** |
+| | | Structured | 24.80 | 0.458 | **1.57\***| +27.0% | 4.8 |
+
+<br>
+
+### Table 2: Sector-wise RNFL Regression Results on GRAPE Dataset (Cross-Modality)
+| Protocol | Global MAE ↓ | Sup. MAE ↓ | Nas. MAE ↓ | Inf. MAE ↓ | Temp. MAE ↑ | $\sigma_{pred}$ |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **RETFound (MAE Only)** | 20.12 | 20.45 | 18.90 | 22.34 | 18.79 | 0.82 (Collapsed) |
+| **Ours (Grad + MAE)** | **19.88** | **19.61** | **18.56** | **22.12** | **19.25** | **12.15 (Preserved)** |
 
 **Key Finding:** Structured protocols cause "template overfitting" (σ=4.8 μm), while our gradient loss preserves anatomical diversity (σ=11.8 μm).
 
