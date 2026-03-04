@@ -1,5 +1,10 @@
 """
 FairFormer-DPT DataLoader - FIXED VERSION V3 (GEOMETRY CORRECTED)
+Cluster Optimized
+
+CHANGES MADE:
+1. Replaced PolarTransform with DiscCrop (Required for RETFound + RadialAggregator)
+2. Kept all your metadata/fairness fixes intact.
 """
 
 import torch
@@ -23,9 +28,9 @@ warnings.filterwarnings('ignore')
 class DataConfig:
     """Configuration optimized for computing cluster"""
     
-    # Paths
-    MASTER_CSV = "./Universal_Master_Dataset_Split_Final.csv"
-    TAR_PATH = "./fairfedmed_dataset.tar"
+    # Paths updated to match standard repository structure
+    MASTER_CSV = "./data/FairFedMed/Universal_Master_Dataset_Split_Final.csv"
+    TAR_PATH = "./data/FairFedMed/fairfedmed_dataset.tar"
     
     # Model parameters
     IMG_SIZE = 224
