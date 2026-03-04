@@ -1,10 +1,5 @@
 """
 FairFormer-DPT DataLoader - FIXED VERSION V3 (GEOMETRY CORRECTED)
-Cluster Optimized
-
-CHANGES MADE:
-1. Replaced PolarTransform with DiscCrop (Required for RETFound + RadialAggregator)
-2. Kept all your metadata/fairness fixes intact.
 """
 
 import torch
@@ -18,6 +13,9 @@ from typing import Optional, Dict
 import cv2
 import warnings
 import io
+from torch.utils.data import Dataset
+from PIL import Image
+import os
 
 warnings.filterwarnings('ignore')
 
@@ -331,3 +329,94 @@ if __name__ == "__main__":
             print("   ✗ Demographic data MISSING!")
     except Exception as e:
         print(f"\n ERROR: {e}")
+
+class GrapeDataset(Dataset):
+    """
+    Dataloader for the GRAPE Dataset (CFP/SLO Cross-Modality).
+    Dynamically applies the same geometric DiscCrop used in the FairFedMed pipeline.
+    """
+    def __init__(self, excel_path, image_dir, transform=None):
+        full_df = pd.read_excel(excel_path)
+        self.df = full_df.iloc[1:].copy()
+
+        # Drop missing images
+        img_col_name = full_df.columns[16]
+        self.df = self.df.dropna(subset=[img_col_name])
+
+        # Force SNIT columns to numeric & Drop rows with '/'
+        target_cols = self.df.columns[12:16]
+        self.df[target_cols] = self.df[target_cols].apply(pd.to_numeric, errors='coerce')
+        self.df = self.df.dropna(subset=target_cols)
+
+        self.image_dir = image_dir
+        self.transform = transform
+        self.targets = self.df[target_cols].values.astype(np.float32)
+        self.filenames = self.df[img_col_name].values
+
+        print(f"Loaded {len(self.df)} clean rows for Sector Analysis.")
+
+    def find_disc_center(self, img_np):
+        """Finds optic disc by locating the brightest blurred region (NumPy instead of PIL)"""
+        cv_img = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
+        blurred = cv2.GaussianBlur(cv_img, (25, 25), 0)
+        _, _, _, maxLoc = cv2.minMaxLoc(blurred)
+        return maxLoc
+
+    def robust_disc_crop(self, img_np, output_size=224):
+        """Applies geometric crop matching FairFedMed logic, using OpenCV for speed/consistency"""
+        cx, cy = self.find_disc_center(img_np)
+        H, W = img_np.shape[:2]
+        
+        crop_radius = int(min(H, W) * 0.25)
+        crop_radius = max(crop_radius, 150)
+        
+        # Ensure bounds
+        x1 = max(0, cx - crop_radius)
+        y1 = max(0, cy - crop_radius)
+        x2 = min(W, cx + crop_radius)
+        y2 = min(H, cy + crop_radius)
+        
+        crop = img_np[y1:y2, x1:x2]
+        
+        if crop.size == 0: 
+            crop = img_np
+            
+        # Resize using Lanczos4 to match FairFedMed exactly
+        resized = cv2.resize(crop, (output_size, output_size), interpolation=cv2.INTER_LANCZOS4)
+        return resized
+
+    def __len__(self): 
+        return len(self.df)
+
+    def __getitem__(self, idx):
+        base_name = str(self.filenames[idx]).strip()
+        img_path = os.path.join(self.image_dir, base_name)
+        
+        if not os.path.exists(img_path): 
+            img_path += ".jpg"
+
+        try:
+            # 1. Load with OpenCV (Matches FairFedMed webdataset behavior)
+            image_bgr = cv2.imread(img_path)
+            if image_bgr is None:
+                raise FileNotFoundError
+            image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
+            
+            # 2. Apply Geometric Crop
+            image_np = self.robust_disc_crop(image_rgb)
+        except Exception as e:
+            # Fallback to black image on failure to prevent dataloader crashing
+            image_np = np.zeros((224, 224, 3), dtype=np.uint8)
+
+        # 3. Apply Albumentations Transform
+        if self.transform:
+            transformed = self.transform(image=image_np)
+            image_tensor = transformed['image']
+        else:
+            image_tensor = torch.from_numpy(image_np).permute(2, 0, 1).float() / 255.0
+
+        return {
+            'image': image_tensor,
+            'target': torch.tensor(self.targets[idx], dtype=torch.float32),  # 4-dim SNIT vector
+            'key': base_name
+        }
