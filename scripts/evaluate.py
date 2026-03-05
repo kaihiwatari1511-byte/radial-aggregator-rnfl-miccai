@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+
 """
 Verify Results Script - MICCAI 2026 Submission #4917
 Reproduces paper metrics from pre-computed predictions
