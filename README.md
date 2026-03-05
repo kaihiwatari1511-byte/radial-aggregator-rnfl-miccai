@@ -122,31 +122,31 @@ python scripts/ablation.py \
     --data_path ./data/FairFedMed
 ```
 
----
-
 ## 📦 Datasets
 
+Due to medical data licensing and Data Use Agreements (DUAs), both datasets must be manually downloaded before running the evaluation pipeline. We do not own or distribute these datasets. 
+
 * **FairFedMed (Primary):** 11,539 images (70/15/15 train/val/test split). Demographics labels included. Format: 224×224 fundus images + 360-point RNFL profiles.
+  * **Access:** Download the raw `.tar` archive and the master split `.csv` from the [FairFedMed GitHub Repository](https://github.com/Harvard-AI-and-Robotics-Lab/FairFedMed).
+  * **Attribution:** Introduced by Li et al. (2025) in *"FairFedMed: Benchmarking Group Fairness in Federated Medical Imaging with FairLoRA"* (IEEE TMI).
+
 * **GRAPE (Cross-Modality Validation):** 243 eyes. Modality: CFP vs SLO. Purpose: Test cross-modality robustness.
+  * **Access:** Request access and download the raw dataset archive from the [GRAPE Dataset Figshare](https://springernature.figshare.com/collections/GRAPE_A_multimodal_glaucoma_dataset_of_follow-up_visual_field_and_fundus_images_for_glaucoma_management/6406319/1).
+  * **Attribution:** Introduced by Huang et al. (2023) in *"GRAPE: A multi-modal dataset of longitudinal follow-up visual field and fundus images for glaucoma management"* (Scientific Data).
 
-**Data Preprocessing:**
+**Data Setup & Preprocessing:**
+Once you have downloaded the raw datasets and agreed to their respective DUAs, place them in your local directory and run our preprocessing scripts to align them with our dataloader's expected geometric format:
+
 ```bash
-# Download and prepare FairFedMed
-python scripts/prepare_fairfedmed.py --download --output data/fairfedmed
+# 1. Prepare FairFedMed (Verifies CSV and aligns TAR structure)
+python scripts/prepare_fairfedmed.py \
+    --input_dir /path/to/your/downloaded/fairfedmed \
+    --output_dir ./data/FairFedMed
 
-# Download and prepare GRAPE
-python scripts/prepare_grape.py --download --output data/grape
-```
-
----
-
-## 🧪 Key Components
-
-### 1. Radial Aggregator
-```python
-from models import RadialAggregator
-aggregator = RadialAggregator(radius_ratio=0.35, n_points=360)
-rnfl_samples = aggregator(spatial_map)  # (B, 56, 56) → (B, 360)
+# 2. Prepare GRAPE (Extracts images and aligns SNIT sector targets)
+python scripts/prepare_grape.py \
+    --input_dir /path/to/your/downloaded/grape \
+    --output_dir ./data/GRAPE
 ```
 *Purpose:* Circularly samples spatial features at 30% radius from optic disc center.
 
