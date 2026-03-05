@@ -225,7 +225,7 @@ python scripts/ablation.py --study learning_rate
 
 
 ## Critical notice
-This work is only for research purpose, it is not for clinical uuse.
+This work is **only for research purpose**, it is **not for clinical use**.
 
 
 ## 📧 Contact
